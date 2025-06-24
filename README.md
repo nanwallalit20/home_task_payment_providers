@@ -59,7 +59,7 @@ cd home_task
 
 2. Start the Docker containers:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 The Docker setup includes:
@@ -69,18 +69,18 @@ The Docker setup includes:
 
 3. Install dependencies and run migrations:
 ```bash
-docker-compose exec app composer install
-docker-compose exec app php artisan migrate
+docker compose exec app composer install
+docker compose exec app php artisan migrate
 ```
 
 4. Generate JWT secret:
 ```bash
-docker-compose exec app php artisan jwt:secret
+docker compose exec app php artisan jwt:secret
 ```
 
 5. Set proper permissions:
 ```bash
-docker-compose exec app chmod -R 755 storage bootstrap/cache
+docker compose exec app chown -R www-data:www-data storage bootstrap/cache
 ```
 
 **Quick Setup Test:**
@@ -294,7 +294,7 @@ Run the test suite:
 
 ```bash
 # Using Docker
-docker-compose exec app php artisan test
+docker compose exec app php artisan test
 
 # Local setup
 php artisan test
