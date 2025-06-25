@@ -54,7 +54,7 @@ See [Payment Provider Documentation](docs/PAYMENT_PROVIDERS.md) for detailed ins
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd home_task
+cd home_task_payment_providers
 ```
 
 2. Start the Docker containers:
