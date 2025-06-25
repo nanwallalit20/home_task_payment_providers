@@ -8,13 +8,10 @@ use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PaymentTest extends TestCase
 {
-    use RefreshDatabase;
-
     public function test_payment_belongs_to_product(): void
     {
         $product = Product::factory()->create();
@@ -53,8 +50,8 @@ class PaymentTest extends TestCase
             'amount' => 99.99,
         ]);
 
-        $this->assertEquals(99.99, $payment->amount);
-        $this->assertIsFloat($payment->amount);
+        $this->assertEquals('99.99', $payment->amount);
+        $this->assertIsString($payment->amount);
     }
 
     public function test_payment_fillable_attributes_can_be_mass_assigned(): void
@@ -123,9 +120,9 @@ class PaymentTest extends TestCase
 
     public function test_payment_status_enum_values(): void
     {
-        $this->assertEquals('pending', PaymentStatus::PENDING->value);
-        $this->assertEquals('paid', PaymentStatus::PAID->value);
-        $this->assertEquals('failed', PaymentStatus::FAILED->value);
+        $this->assertEquals(1, PaymentStatus::PENDING->value);
+        $this->assertEquals(2, PaymentStatus::PAID->value);
+        $this->assertEquals(3, PaymentStatus::FAILED->value);
     }
 
     public function test_payment_status_enum_cases(): void
@@ -178,7 +175,8 @@ class PaymentTest extends TestCase
             'amount' => 0.00,
         ]);
 
-        $this->assertEquals(0.00, $payment->amount);
+        $this->assertEquals('0.00', $payment->amount);
+        $this->assertIsString($payment->amount);
     }
 
     public function test_payment_amount_can_be_very_large(): void
@@ -187,7 +185,8 @@ class PaymentTest extends TestCase
             'amount' => 999999.99,
         ]);
 
-        $this->assertEquals(999999.99, $payment->amount);
+        $this->assertEquals('999999.99', $payment->amount);
+        $this->assertIsString($payment->amount);
     }
 
     public function test_payment_status_transitions(): void

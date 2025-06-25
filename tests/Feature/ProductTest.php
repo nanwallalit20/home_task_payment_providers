@@ -6,13 +6,12 @@ namespace Tests\Feature;
 
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 
 class ProductTest extends TestCase
 {
-    use RefreshDatabase, WithFaker;
+    use WithFaker;
 
     protected User $user;
     protected string $token;
@@ -311,23 +310,23 @@ class ProductTest extends TestCase
         $product = Product::factory()->create();
 
         // Test index
-        $response = $this->getJson('/api/products');
+        $response = $this->withHeaders(['Accept' => 'application/json'])->getJson('/api/products');
         $response->assertStatus(401);
 
         // Test store
-        $response = $this->postJson('/api/products', []);
+        $response = $this->withHeaders(['Accept' => 'application/json'])->postJson('/api/products', []);
         $response->assertStatus(401);
 
         // Test show
-        $response = $this->getJson("/api/products/{$product->id}");
+        $response = $this->withHeaders(['Accept' => 'application/json'])->getJson("/api/products/{$product->id}");
         $response->assertStatus(401);
 
         // Test update
-        $response = $this->putJson("/api/products/{$product->id}", []);
+        $response = $this->withHeaders(['Accept' => 'application/json'])->putJson("/api/products/{$product->id}", []);
         $response->assertStatus(401);
 
         // Test delete
-        $response = $this->deleteJson("/api/products/{$product->id}");
+        $response = $this->withHeaders(['Accept' => 'application/json'])->deleteJson("/api/products/{$product->id}");
         $response->assertStatus(401);
     }
 

@@ -25,6 +25,7 @@ services:
       - CACHE_STORE=database
       - SESSION_DRIVER=database
       - QUEUE_CONNECTION=database
+      - JWT_SECRET=eYPphsBgQRdVPX25L2WICb736SvvCdx1RCjAAnMHomn7ZWvSOYyObtWb6y0OtbR7
       - JWT_ALGO=HS256
       - JWT_TTL=60
       - JWT_REFRESH_TTL=20160

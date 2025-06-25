@@ -5,11 +5,14 @@ namespace Tests;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Artisan;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 abstract class TestCase extends BaseTestCase
 {
+    use DatabaseTransactions;
+
     protected User $user;
     protected string $token;
     protected Product $product;

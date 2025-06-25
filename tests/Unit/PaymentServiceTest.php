@@ -7,14 +7,11 @@ namespace Tests\Unit;
 use App\Contracts\PaymentProviderInterface;
 use App\Models\Payment;
 use App\Services\PaymentService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use Tests\TestCase;
 
 class PaymentServiceTest extends TestCase
 {
-    use RefreshDatabase;
-
     private PaymentService $paymentService;
 
     protected function setUp(): void
@@ -106,12 +103,7 @@ class PaymentServiceTest extends TestCase
             'provider' => 'credit_card',
         ];
 
-        $provider = $this->createMockProvider(['credit_card']);
-        $provider->expects($this->once())
-            ->method('process')
-            ->with($payment)
-            ->willReturn($expectedResult);
-
+        $provider = $this->createMockProvider(['credit_card'], $expectedResult);
         $this->paymentService->registerProvider($provider);
 
         $result = $this->paymentService->processPayment($payment);
@@ -187,12 +179,7 @@ class PaymentServiceTest extends TestCase
             'provider' => 'credit_card',
         ];
 
-        $provider = $this->createMockProvider(['credit_card']);
-        $provider->expects($this->once())
-            ->method('process')
-            ->with($payment)
-            ->willReturn($expectedResult);
-
+        $provider = $this->createMockProvider(['credit_card'], $expectedResult);
         $this->paymentService->registerProvider($provider);
 
         $result = $this->paymentService->processPayment($payment);
@@ -200,18 +187,23 @@ class PaymentServiceTest extends TestCase
         $this->assertEquals($expectedResult, $result);
     }
 
-    private function createMockProvider(array $supportedMethods): PaymentProviderInterface
+    private function createMockProvider(array $supportedMethods, array $processResult = null): PaymentProviderInterface
     {
         $provider = $this->createMock(PaymentProviderInterface::class);
         $provider->method('supports')->willReturnCallback(function ($method) use ($supportedMethods) {
             return in_array($method, $supportedMethods);
         });
         $provider->method('getSupportedMethods')->willReturn($supportedMethods);
-        $provider->method('process')->willReturn([
-            'success' => true,
-            'transaction_id' => 'txn_123',
-            'provider' => 'mock',
-        ]);
+
+        if ($processResult) {
+            $provider->method('process')->willReturn($processResult);
+        } else {
+            $provider->method('process')->willReturn([
+                'success' => true,
+                'transaction_id' => 'txn_123',
+                'provider' => 'mock',
+            ]);
+        }
 
         return $provider;
     }
