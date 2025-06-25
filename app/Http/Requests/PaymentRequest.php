@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Services\PaymentService;
-use Illuminate\Foundation\Http\FormRequest;
 
-class PaymentRequest extends FormRequest
+class PaymentRequest extends BaseFormRequest
 {
     public function __construct(
         private PaymentService $paymentService

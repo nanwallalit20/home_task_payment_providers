@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
@@ -28,7 +29,7 @@ class AuthController extends Controller
             'password' => Hash::make($request->validated('password')),
         ]);
 
-        $token = Auth::login($user);
+        $token = JWTAuth::fromUser($user);
 
         return $this->successResponse([
             'user' => $user,
@@ -43,14 +44,14 @@ class AuthController extends Controller
     {
         $credentials = $request->validated();
 
-        if (!$token = Auth::attempt($credentials)) {
-            throw ValidationException::withMessages([
+        if (!$token = Auth::guard('api')->attempt($credentials)) {
+            return $this->errorResponse('Login failed', [
                 'email' => ['The provided credentials are incorrect.'],
-            ]);
+            ], 401);
         }
 
         return $this->successResponse([
-            'user' => Auth::user(),
+            'user' => Auth::guard('api')->user(),
             'token' => $token,
         ], 'Login successful');
     }
@@ -60,7 +61,7 @@ class AuthController extends Controller
      */
     public function logout(): JsonResponse
     {
-        Auth::logout();
+        Auth::guard('api')->logout();
 
         return $this->successResponse([], 'Successfully logged out');
     }
@@ -71,7 +72,7 @@ class AuthController extends Controller
     public function refresh(): JsonResponse
     {
         return $this->successResponse([
-            'token' => Auth::refresh(),
+            'token' => Auth::guard('api')->refresh(),
         ]);
     }
 
@@ -81,7 +82,7 @@ class AuthController extends Controller
     public function me(): JsonResponse
     {
         return $this->successResponse([
-            'user' => Auth::user(),
+            'user' => Auth::guard('api')->user(),
         ]);
     }
 }

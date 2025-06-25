@@ -73,9 +73,13 @@ docker compose exec app composer install
 docker compose exec app php artisan migrate
 ```
 
-4. Generate JWT secret:
+4. Generate application keys:
 ```bash
-docker compose exec app php artisan jwt:secret
+# Generate Laravel application encryption key
+docker compose exec app php artisan key:generate 
+
+# Generate JWT secret for authentication
+docker compose exec app php artisan jwt:secret 
 ```
 
 5. Set proper permissions:

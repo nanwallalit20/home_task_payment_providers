@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Artisan;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -19,9 +20,6 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Run migrations for each test
-        Artisan::call('migrate:fresh');
     }
 
     /**
@@ -30,7 +28,7 @@ abstract class TestCase extends BaseTestCase
     protected function createAuthenticatedUser(): void
     {
         $this->user = User::factory()->create();
-        $this->token = auth('api')->login($this->user);
+        $this->token = JWTAuth::fromUser($this->user);
     }
 
     /**

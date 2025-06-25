@@ -14,8 +14,8 @@ class ProductTest extends TestCase
 {
     use RefreshDatabase, WithFaker;
 
-    private User $user;
-    private string $token;
+    protected User $user;
+    protected string $token;
 
     protected function setUp(): void
     {
@@ -25,9 +25,48 @@ class ProductTest extends TestCase
         $this->token = auth('api')->login($this->user);
     }
 
-    /**
-     * Test user can create a product.
-     */
+    public function test_user_can_list_their_products(): void
+    {
+        $userProducts = Product::factory()->count(3)->create([
+            'user_id' => $this->user->id,
+        ]);
+
+        // Create products for another user
+        Product::factory()->count(2)->create();
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->getJson('/api/products');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'products' => [
+                        '*' => [
+                            'id',
+                            'name',
+                            'quantity',
+                            'user_id',
+                            'created_at',
+                            'updated_at',
+                        ],
+                    ],
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $responseProducts = $response->json('data.products');
+        $this->assertCount(3, $responseProducts);
+
+        // Verify only user's products are returned
+        foreach ($responseProducts as $product) {
+            $this->assertEquals($this->user->id, $product['user_id']);
+        }
+    }
+
     public function test_user_can_create_product(): void
     {
         $productData = [
@@ -41,8 +80,29 @@ class ProductTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonStructure([
+                'success',
                 'message',
-                'product' => ['id', 'name', 'quantity', 'user_id'],
+                'data' => [
+                    'product' => [
+                        'id',
+                        'name',
+                        'quantity',
+                        'user_id',
+                        'created_at',
+                        'updated_at',
+                    ],
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'Product created successfully',
+                'data' => [
+                    'product' => [
+                        'name' => $productData['name'],
+                        'quantity' => $productData['quantity'],
+                        'user_id' => $this->user->id,
+                    ],
+                ],
             ]);
 
         $this->assertDatabaseHas('products', [
@@ -52,69 +112,59 @@ class ProductTest extends TestCase
         ]);
     }
 
-    /**
-     * Test product creation validation.
-     */
-    public function test_product_creation_validation(): void
+    public function test_user_cannot_create_product_with_invalid_data(): void
     {
+        $productData = [
+            'name' => '', // Empty name
+            'quantity' => -5, // Negative quantity
+        ];
+
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-        ])->postJson('/api/products', []);
+        ])->postJson('/api/products', $productData);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['name', 'quantity']);
     }
 
-    /**
-     * Test user can list their products.
-     */
-    public function test_user_can_list_products(): void
+    public function test_user_can_view_their_product(): void
     {
-        Product::factory()->count(3)->create([
+        $product = Product::factory()->create([
             'user_id' => $this->user->id,
         ]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-        ])->getJson('/api/products');
+        ])->getJson("/api/products/{$product->id}");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'products' => [
-                    'data' => [
-                        '*' => ['id', 'name', 'quantity', 'user_id'],
+                'success',
+                'data' => [
+                    'product' => [
+                        'id',
+                        'name',
+                        'quantity',
+                        'user_id',
+                        'created_at',
+                        'updated_at',
+                    ],
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'product' => [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'quantity' => $product->quantity,
+                        'user_id' => $this->user->id,
                     ],
                 ],
             ]);
     }
 
-    /**
-     * Test user can view their own product.
-     */
-    public function test_user_can_view_own_product(): void
-    {
-        $product = Product::factory()->create([
-            'user_id' => $this->user->id,
-        ]);
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
-        ])->getJson('/api/products/' . $product->id);
-
-        $response->assertStatus(200)
-            ->assertJson([
-                'product' => [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'quantity' => $product->quantity,
-                ],
-            ]);
-    }
-
-    /**
-     * Test user cannot view another user's product.
-     */
-    public function test_user_cannot_view_other_user_product(): void
+    public function test_user_cannot_view_another_users_product(): void
     {
         $otherUser = User::factory()->create();
         $product = Product::factory()->create([
@@ -123,15 +173,16 @@ class ProductTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-        ])->getJson('/api/products/' . $product->id);
+        ])->getJson("/api/products/{$product->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Unauthorized access to product',
+            ]);
     }
 
-    /**
-     * Test user can update their own product.
-     */
-    public function test_user_can_update_own_product(): void
+    public function test_user_can_update_their_product(): void
     {
         $product = Product::factory()->create([
             'user_id' => $this->user->id,
@@ -144,23 +195,44 @@ class ProductTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-        ])->putJson('/api/products/' . $product->id, $updateData);
+        ])->putJson("/api/products/{$product->id}", $updateData);
 
         $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'product' => [
+                        'id',
+                        'name',
+                        'quantity',
+                        'user_id',
+                        'created_at',
+                        'updated_at',
+                    ],
+                ],
+            ])
             ->assertJson([
+                'success' => true,
                 'message' => 'Product updated successfully',
-                'product' => [
-                    'id' => $product->id,
-                    'name' => $updateData['name'],
-                    'quantity' => $updateData['quantity'],
+                'data' => [
+                    'product' => [
+                        'id' => $product->id,
+                        'name' => $updateData['name'],
+                        'quantity' => $updateData['quantity'],
+                        'user_id' => $this->user->id,
+                    ],
                 ],
             ]);
+
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'name' => $updateData['name'],
+            'quantity' => $updateData['quantity'],
+        ]);
     }
 
-    /**
-     * Test user cannot update another user's product.
-     */
-    public function test_user_cannot_update_other_user_product(): void
+    public function test_user_cannot_update_another_users_product(): void
     {
         $otherUser = User::factory()->create();
         $product = Product::factory()->create([
@@ -174,15 +246,23 @@ class ProductTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-        ])->putJson('/api/products/' . $product->id, $updateData);
+        ])->putJson("/api/products/{$product->id}", $updateData);
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Unauthorized access to product',
+            ]);
+
+        // Verify product was not updated
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'name' => $product->name,
+            'quantity' => $product->quantity,
+        ]);
     }
 
-    /**
-     * Test user can delete their own product.
-     */
-    public function test_user_can_delete_own_product(): void
+    public function test_user_can_delete_their_product(): void
     {
         $product = Product::factory()->create([
             'user_id' => $this->user->id,
@@ -190,18 +270,20 @@ class ProductTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-        ])->deleteJson('/api/products/' . $product->id);
+        ])->deleteJson("/api/products/{$product->id}");
 
         $response->assertStatus(200)
-            ->assertJson(['message' => 'Product deleted successfully']);
+            ->assertJson([
+                'success' => true,
+                'message' => 'Product deleted successfully',
+            ]);
 
-        $this->assertDatabaseMissing('products', ['id' => $product->id]);
+        $this->assertDatabaseMissing('products', [
+            'id' => $product->id,
+        ]);
     }
 
-    /**
-     * Test user cannot delete another user's product.
-     */
-    public function test_user_cannot_delete_other_user_product(): void
+    public function test_user_cannot_delete_another_users_product(): void
     {
         $otherUser = User::factory()->create();
         $product = Product::factory()->create([
@@ -210,8 +292,85 @@ class ProductTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-        ])->deleteJson('/api/products/' . $product->id);
+        ])->deleteJson("/api/products/{$product->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Unauthorized access to product',
+            ]);
+
+        // Verify product was not deleted
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+        ]);
+    }
+
+    public function test_unauthenticated_user_cannot_access_product_routes(): void
+    {
+        $product = Product::factory()->create();
+
+        // Test index
+        $response = $this->getJson('/api/products');
+        $response->assertStatus(401);
+
+        // Test store
+        $response = $this->postJson('/api/products', []);
+        $response->assertStatus(401);
+
+        // Test show
+        $response = $this->getJson("/api/products/{$product->id}");
+        $response->assertStatus(401);
+
+        // Test update
+        $response = $this->putJson("/api/products/{$product->id}", []);
+        $response->assertStatus(401);
+
+        // Test delete
+        $response = $this->deleteJson("/api/products/{$product->id}");
+        $response->assertStatus(401);
+    }
+
+    public function test_product_quantity_cannot_be_negative(): void
+    {
+        $productData = [
+            'name' => $this->faker->word(),
+            'quantity' => -1,
+        ];
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->postJson('/api/products', $productData);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['quantity']);
+    }
+
+    public function test_product_name_is_required(): void
+    {
+        $productData = [
+            'quantity' => 10,
+        ];
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->postJson('/api/products', $productData);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_product_quantity_is_required(): void
+    {
+        $productData = [
+            'name' => $this->faker->word(),
+        ];
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->postJson('/api/products', $productData);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['quantity']);
     }
 }

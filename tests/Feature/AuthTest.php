@@ -13,10 +13,7 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase, WithFaker;
 
-    /**
-     * Test user registration.
-     */
-    public function test_user_can_register(): void
+    public function test_user_can_register_with_valid_data(): void
     {
         $userData = [
             'name' => $this->faker->name(),
@@ -29,67 +26,134 @@ class AuthTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonStructure([
+                'success',
                 'message',
-                'user' => ['id', 'name', 'email'],
-                'token',
+                'data' => [
+                    'user' => [
+                        'id',
+                        'name',
+                        'email',
+                        'created_at',
+                        'updated_at',
+                    ],
+                    'token',
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'User registered successfully',
             ]);
 
         $this->assertDatabaseHas('users', [
+            'name' => $userData['name'],
             'email' => $userData['email'],
         ]);
     }
 
-    /**
-     * Test user registration validation.
-     */
-    public function test_user_registration_validation(): void
+    public function test_user_cannot_register_with_invalid_email(): void
     {
-        $response = $this->postJson('/api/users', []);
+        $userData = [
+            'name' => $this->faker->name(),
+            'email' => 'invalid-email',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ];
+
+        $response = $this->postJson('/api/users', $userData);
 
         $response->assertStatus(422)
-            ->assertJsonValidationErrors(['name', 'email', 'password']);
+            ->assertJsonValidationErrors(['email']);
     }
 
-    /**
-     * Test user login.
-     */
-    public function test_user_can_login(): void
+    public function test_user_cannot_register_with_existing_email(): void
+    {
+        $existingUser = User::factory()->create();
+
+        $userData = [
+            'name' => $this->faker->name(),
+            'email' => $existingUser->email,
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ];
+
+        $response = $this->postJson('/api/users', $userData);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
+    }
+
+    public function test_user_cannot_register_with_mismatched_passwords(): void
+    {
+        $userData = [
+            'name' => $this->faker->name(),
+            'email' => $this->faker->unique()->safeEmail(),
+            'password' => 'password123',
+            'password_confirmation' => 'differentpassword',
+        ];
+
+        $response = $this->postJson('/api/users', $userData);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['password']);
+    }
+
+    public function test_user_can_login_with_valid_credentials(): void
     {
         $user = User::factory()->create([
             'password' => bcrypt('password123'),
         ]);
 
-        $response = $this->postJson('/api/login', [
+        $credentials = [
             'email' => $user->email,
             'password' => 'password123',
-        ]);
+        ];
+
+        $response = $this->postJson('/api/login', $credentials);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
+                'success',
                 'message',
-                'user' => ['id', 'name', 'email'],
-                'token',
+                'data' => [
+                    'user' => [
+                        'id',
+                        'name',
+                        'email',
+                        'created_at',
+                        'updated_at',
+                    ],
+                    'token',
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+                'message' => 'Login successful',
             ]);
     }
 
-    /**
-     * Test user login with invalid credentials.
-     */
-    public function test_user_login_with_invalid_credentials(): void
+    public function test_user_cannot_login_with_invalid_credentials(): void
     {
         $user = User::factory()->create();
 
-        $response = $this->postJson('/api/login', [
+        $credentials = [
             'email' => $user->email,
             'password' => 'wrongpassword',
-        ]);
+        ];
 
-        $response->assertStatus(422);
+        $response = $this->postJson('/api/login', $credentials);
+
+        $response->assertStatus(401)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Login failed',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'email',
+                ],
+            ]);
     }
 
-    /**
-     * Test user logout.
-     */
     public function test_user_can_logout(): void
     {
         $user = User::factory()->create();
@@ -100,12 +164,12 @@ class AuthTest extends TestCase
         ])->postJson('/api/logout');
 
         $response->assertStatus(200)
-            ->assertJson(['message' => 'Successfully logged out']);
+            ->assertJson([
+                'success' => true,
+                'message' => 'Successfully logged out',
+            ]);
     }
 
-    /**
-     * Test token refresh.
-     */
     public function test_user_can_refresh_token(): void
     {
         $user = User::factory()->create();
@@ -116,12 +180,20 @@ class AuthTest extends TestCase
         ])->postJson('/api/refresh');
 
         $response->assertStatus(200)
-            ->assertJsonStructure(['token']);
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'token',
+                ],
+            ])
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        // Verify the new token is different
+        $this->assertNotEquals($token, $response->json('data.token'));
     }
 
-    /**
-     * Test get authenticated user.
-     */
     public function test_user_can_get_profile(): void
     {
         $user = User::factory()->create();
@@ -132,12 +204,48 @@ class AuthTest extends TestCase
         ])->getJson('/api/me');
 
         $response->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'user' => [
+                        'id',
+                        'name',
+                        'email',
+                        'created_at',
+                        'updated_at',
+                    ],
+                ],
+            ])
             ->assertJson([
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
+                'success' => true,
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                    ],
                 ],
             ]);
+    }
+
+    public function test_unauthenticated_user_cannot_access_protected_routes(): void
+    {
+        $response = $this->getJson('/api/me');
+
+        $response->assertStatus(401);
+    }
+
+    public function test_unauthenticated_user_cannot_logout(): void
+    {
+        $response = $this->postJson('/api/logout');
+
+        $response->assertStatus(401);
+    }
+
+    public function test_unauthenticated_user_cannot_refresh_token(): void
+    {
+        $response = $this->postJson('/api/refresh');
+
+        $response->assertStatus(401);
     }
 }
